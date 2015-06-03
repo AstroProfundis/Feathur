@@ -1,4 +1,5 @@
 <?php
+set_include_path(get_include_path() . PATH_SEPARATOR . 'includes/library/');
 include('./includes/functions/user.class.php');
 include('./includes/functions/core.class.php');
 include('./includes/functions/settings.class.php');
@@ -10,6 +11,7 @@ include('./includes/functions/servers.class.php');
 include('./includes/functions/ipaddresses.class.php');
 include('./includes/functions/ipv6addresses.class.php');
 include('./includes/functions/blocks.class.php');
+include('./includes/functions/useripv6blocks.class.php');
 include('./includes/functions/server.blocks.class.php');
 include('./includes/library/Net/SSH2.php');
 include('./includes/library/Crypt/RSA.php');
@@ -20,6 +22,9 @@ include('./includes/functions/statistics.class.php');
 include('./includes/functions/rdns.class.php');
 include('./includes/functions/transfer.class.php');
 include('./includes/functions/attempts.class.php');
+include('./includes/functions/smtp.class.php');
+include('./includes/functions/groups.class.php');
+include('./includes/functions/server.groups.class.php');
 
 function ConvertTime($ss) {
 	if(!empty($ss)){
@@ -107,4 +112,8 @@ function check_updates(){
 	} else {
 		return array("your_version" => $sCurrentVersion, "current_version" => $sVersion, "update" => "0");
 	}
+}
+
+function endsWith($haystack, $needle){
+    return $needle === "" || substr($haystack, -strlen($needle)) === $needle;
 }

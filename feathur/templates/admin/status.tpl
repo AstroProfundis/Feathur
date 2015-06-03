@@ -1,93 +1,196 @@
-<div id="Status" style="margin:5px;">
-	<script type="text/javascript">
-		$(document).ready(function() {
-			var counttx = 0;
-			function timerrx() {
-				counttx=counttx+1;
-				$('#timer').html(counttx);
-			}
-			function uptime() {
-					$(function() {
-							$.getJSON("admin.php?json=1",function(result){
-									$("#Status").html(result.content);
-									counttx=0;
-							});
+﻿<div class="pure-u-1">
+    <div class="inset-text" style="line-height: 29px;">Welcome to Feathur. On this page, you can view the statuses of all of the servers. Click on one to view more information.
+    </div>
+</div>
+<br>
+<div class="pure-u-1 well">
+    <h2 class="timer"><i class="fa fa-clock-o"></i> Status last updated <a id="timer" style="white-space:nowrap;">0</a> seconds ago</h2>
+    <div id="timerStats" class="smalltext"><span></span> of <span></span> servers online&nbsp;&nbsp;-&nbsp;&nbsp;<span></span> with high bandwidth usage&nbsp;&nbsp;-&nbsp;&nbsp;<span></span> servers total</div>
+</div>
+
+<div id="errorcontain" class="pure-u-1 pure-g">
+    <div class="pure-u-md-1 pure-u-lg-1 pure-u-xl-1-3">
+        <div class="alert errorbox static-alert" style="display: none;">
+            Server(s) Down: <p class="inlineB"></p>
+        </div>
+    </div>
+    <div class="pure-u-md-1 pure-u-lg-1 pure-u-xl-1-3">
+        <div class="alert warningbox 1 static-alert" style="display: none;">
+            High bandwidth usage on: <p class="inlineB"></p>
+        </div>
+    </div>
+    {%if isempty|TemplatesRedone == true}
+        <div class="pure-u-md-1 pure-u-lg-1 pure-u-xl-1-3">
+            <div class="alert warningbox 2 static-alert">
+                We have updated the template system. As part of that unfortunately all existing template database entries have been removed from the system. The table has been backed up as 'templates_old'. Any templates on the hard disk have been left where they are for the time being. The new system uses URL based downloads instead of rsync or localized downloads. You can disable this message in <a href="admin.php?view=settings">settings</a>.
+                <br>
+            </div>
+        </div>
+    {%/if}
+</div>
+
+<div id="serverstatscontain" class="pure-u-1">
+
+<script type="text/javascript">
+    var prevServerCount = 0;
+    var curServerCount = 0;
+    
+    var addserverhtml = '<a href="admin.php?view=addserver"><div id="addServer"><b>+</b></div></a>';
+    
+    var getBgColor = function(percent){
+        if(percent <= 50){return "rgb(0, 255, 224)";} //blue
+        else if(percent <= 75){return "rgb(0, 255, 31)";} //green
+        else if(percent <= 90){return "rgb(255, 204, 0)";} //yellow
+        else if(percent <= 100){return "rgb(255, 173, 0)";} //orange
+        else if(percent > 100){return "rgb(255, 0, 0)";} //red
+    }
+    
+    loading(1);
+	var counttx = 0;
+    $(document).ready(function () {
+		function timerrx() {
+            counttx = counttx + 1;
+            $('#timer').html(counttx);
+        }
+		
+		function uptime() {
+            if(!$('#serverstatscontain a[href*="addserver"]').length){$("#serverstatscontain").html(addserverhtml)};
+			$.getJSON("admin.php?json-variables=1", function (result) {
+                var html = '';
+                var srvtype = ''
+                var ipcount = 0;
+				var servercount = result.servers.length;
+                curServerCount = servercount;
+                var serversoffline = [];
+                var bandwidthstr = '';
+                var servershighbandwidth = [];
+                
+				if (servercount == 0) {
+                    html += addserverhtml;
+                    return;
+                } else {
+					$.each(result.servers, function (i, val) {
+                        //alert(val.load);
+                        srvtype = val.type;
+                        ipcount = val.ip_count;
+                        if(srvtype == "openvz"){srvtype = "OpenVZ"}else if(srvtype == "kvm"){srvtype = "KVM"}else{srvtype = srvtype};
+                        if(ipcount == null){ipcount = 0}
+                        
+                        //Check if statusbox is in DOM already, if not, create it
+                        if($(".statusbox.status-"+val.id+"").length) {
+                            //console.log("found element for ID:"+val.id);
+                            if (val.status == true) { // If online replace old data with new data
+                                var bandwidthstr = val.bandwidth;
+                                if(bandwidthstr >= 100){servershighbandwidth.push(val.name);}
+                                $(".statusbox.status-"+val.id+" .statuscolor").attr("class", "statuscolor statuscoloronline");
+                                $(".statusbox.status-"+val.id+" .stat-virtualization").html(srvtype);
+                                $(".statusbox.status-"+val.id+" .stat-ram").html("RAM: "+val.ram_usage+"%");
+                                $(".statusbox.status-"+val.id+" .stat-disk").html("Disk: "+val.disk_usage+"%");
+                                $(".statusbox.status-"+val.id+" .stat-name").html(val.name+" (IPs: "+ipcount+")");
+                                $(".statusbox.status-"+val.id+" .mem-prog").css("width",val.ram_usage+"%");
+                                $(".statusbox.status-"+val.id+" .disk-prog").css("width",val.disk_usage+"%");
+                                $(".statusbox.status-"+val.id+" .stat-load").html(val.load_average);
+                                $(".statusbox.status-"+val.id+" .stat-bandwidth").html(val.bandwidth);
+                                $(".statusbox.status-"+val.id+" .stat-uptime").html(val.uptime);
+                                $(".statusbox.status-"+val.id+" .progress-ram-overlay").css("background",getBgColor(val.ram_usage));
+                                $(".statusbox.status-"+val.id+" .progress-disk-overlay").css("background",getBgColor(val.disk_usage));
+                            } else {// If offline replace with filler data unless the data is able to be found
+                                serversoffline.push(val.name);
+                                $(".statusbox.status-"+val.id+" .statuscolor").attr("class", "statuscolor statuscoloroffline");
+                                $(".statusbox.status-"+val.id+" .stat-virtualization").html(srvtype);
+                                $(".statusbox.status-"+val.id+" .stat-ram").html("RAM: N/A");
+                                $(".statusbox.status-"+val.id+" .stat-disk").html("Disk: N/A");
+                                $(".statusbox.status-"+val.id+" .stat-name").html(val.name+" (IPs: "+ipcount+")");
+                                $(".statusbox.status-"+val.id+" .mem-prog").css("width","0%");
+                                $(".statusbox.status-"+val.id+" .disk-prog").css("width","0%");
+                                $(".statusbox.status-"+val.id+" .stat-load").html("0.00");
+                                $(".statusbox.status-"+val.id+" .stat-bandwidth").html("0.00 Mbps");
+                                $(".statusbox.status-"+val.id+" .stat-uptime").html("OFFLINE");
+                                $(".statusbox.status-"+val.id+" .progress-ram-overlay").css("background",getBgColor(0));
+                                $(".statusbox.status-"+val.id+" .progress-disk-overlay").css("background",getBgColor(0));
+                            }
+                        }else{ //Creating box, couldn't find one already created. This is the base html for the status boxes. Changes here that you expect to have automatically update will need to be added above.
+                            //console.log("Could NOT find element for ID:"+val.id);
+                            if (val.status == true) {
+                                var bandwidthstr = val.bandwidth;
+                                if(bandwidthstr >= 100){servershighbandwidth.push(val.name);}
+                                bandwidthstr = bandwidthstr.replace("Mbps","");
+                                boxhtml = '<a href="admin.php?view=list&type=search&search=server='+val.id+'"><div class="fluidbox statusbox status-'+val.id+'">'
+                                    + '<div class="statuscolor statuscoloronline">'
+                                    + '</div>'
+                                    + '<div class="pure-u-1-2" style="float:right;">'
+                                    + '<h3 style="text-align:center;" class="status-virtualization">Virtualization: ' + srvtype + '</h3>'
+                                    + '<div><span class="stat-ram">RAM: '+val.ram_usage+'%</span><div class="progressContain"><div class="mem-prog progressbar" style="max-width: 100%;width:'+val.ram_usage+'%;"><div class="progress-overlay progress-ram-overlay" style="background:'+getBgColor(val.ram_usage)+'"></div></div></div></div>'
+                                    + '<div><span class="stat-disk">Disk: ' + val.disk_usage + '%</span><div class="progressContain"><div class="disk-prog progressbar" style="max-width: 100%;width:'+val.disk_usage+'%;"><div class="progress-overlay progress-disk-overlay" style="background:'+getBgColor(val.disk_usage)+'"></div></div></div></div>'
+                                    + '</div>'
+                                    + '<div class="statusTxtInfo pure-u-1-2" style="float:left">'
+                                    + '<h3 class="stat-name">' + val.name + ' (IPs: ' + ipcount + ')</h3>'
+                                    + 'Load: <span class="stat-load">' + val.load_average + '</span><br>'
+                                    + 'Bandwidth: <span class="stat-bandwidth">' + val.bandwidth + '</span><br>'
+                                    + 'Uptime: <span class="stat-uptime">' + val.uptime + '</span>'
+                                    + '</div>'
+                                    + '</div></div><!--/div-->';
+                                $(boxhtml).insertBefore('a[href*="addserver"]');
+                            } else {
+                                serversoffline.push(val.name);
+                                boxhtml = '<a href="admin.php?view=list&type=search&search=server='+val.id+'"><div class="fluidbox statusbox status-'+val.id+'">'
+                                    + '<div class="statuscolor statuscoloroffline">'
+                                    + '</div>'
+                                    + '<div class="pure-u-1-2" style="float:right;">'
+                                    + '<h3 style="text-align:center;" class="status-virtualization">Virtualization: ' + srvtype + '</h3>'
+                                    + '<div><span class="stat-ram">RAM: N/A</span><div class="progressContain"><div class="mem-prog progressbar" style="max-width: 100%;width:0%;"><div class="progress-overlay progress-ram-overlay"></div></div></div></div>'
+                                    + '<div><span class="stat-disk">Disk: N/A</span><div class="progressContain"><div class="disk-prog progressbar" style="max-width: 100%;width:0%;"><div class="progress-overlay progress-disk-overlay"></div></div></div></div>'
+                                    + '</div>'
+                                    + '<div class="statusTxtInfo pure-u-1-2" style="float:left">'
+                                    + '<h3 class="stat-name">' + val.name + ' (IPs: ' + ipcount + ')</h3>'
+                                    + 'Load: <span class="stat-load">0.00</span><br>'
+                                    + 'Bandwidth: <span class="stat-bandwidth">0.00 Mbps</span><br>'
+                                    + 'Uptime: <span class="stat-uptime">OFFLINE</span>'
+                                    + '</div>'
+                                    + '</div></div><!--/div-->';
+                                $(".statusbox.status-"+val.id+" .progress-ram-overlay").css("background",getBgColor(0));
+                                $(".statusbox.status-"+val.id+" .progress-disk-overlay").css("background",getBgColor(0));
+                                $(boxhtml).insertBefore('a[href*="addserver"]');
+                            }
+                        }
 					});
-			}
-			{%if isset|Status == false}
-				setInterval(uptime, {%?RefreshTime}000);
-				setInterval(timerrx, 1000);
-			{%/if}
-		});
-	</script>
-	<div align="center">Welcome to Feathur, here is a quick system report:</div><br><br>
-	{%if isset|Down == true}
-		<div class="albox errorbox">
-			Server(s) Down: {%foreach system in Down}{%?system[name]}, {%/foreach}
-			<a href="#" class="close tips" title="close">close</a>
-		</div>
-		<br><br>
-	{%/if}
-	{%if isset|High == true}
-		<div class="albox warningbox">
-		High bandwidth usage on: {%foreach system in High}{%?system[name]}, {%/foreach}
-			<a href="#" class="close tips" title="close">close</a>
-		</div>
-		<br><br>
-	{%/if}
-	<div style="width:30px;display:inline;white-space:nowrap;">Last update: <a id="timer" style="white-space:nowrap;">0</a> seconds ago</div>
-	<br><br>
-	{%if isset|Statistics == true}
-		{%foreach server in Statistics}
-			<div class="simplebox grid360-{%if isempty|server[type] == true}right{%/if}{%if isempty|server[type] == false}left{%/if}" style="padding:3px;padding-bottom:10px;">
-				<div class="titleh">
-					<h3>
-						<div style="width:39%;float:left;">
-							<img src="./templates/status/{%if isempty|server[status] == true}offline{%/if}{%if isempty|server[status] == false}online{%/if}.png" style="width:10px;height:10px;">{%if isset|server[name] == true}&nbsp;{%?server[name]}{%/if}
-						</div>
-						{%if isempty|server[status] == false}
-							<div style="width:59%;float:right;padding-right:5px;" align="right">
-								{%if isempty|server[ip_count] == false}({%?server[ip_count]}) | {%/if}
-								{%if isempty|server[load_average] == false}Load: {%?server[load_average]}{%/if}
-								{%if isempty|server[load_average] == false}{%if isempty|server[bandwidth] == false}&nbsp;|&nbsp;{%/if}{%/if}
-								{%if isempty|server[bandwidth] == false}BW: {%?server[bandwidth]}{%/if}
-							</div>
-						{%/if}
-					</h3>
-				</div>
-				<div class="body padding10">
-					<div align="center" style="height:50px;">
-						{%if isempty|server[status] == false}
-							Uptime: {%if isempty|server[uptime] == false}{%?server[uptime]}{%/if}
-							<hr>
-							<div style="width:40%;float:left;">
-								<strong>Memory Usage:</strong>
-								<div class="progress" style="padding:0;margin:0;">
-									<div class="bar bar-warning" style="width: {%?server[ram_usage]}%;padding-top:5px;">U</div>
-									<div class="bar bar-success" style="width: {%?server[ram_free]}%;padding-top:5px;">F</div>
-								</div>
-							</div>
-							<div style="width:40%;float:right;">
-								<strong>Disk Usage:</strong>
-								<div class="progress" style="padding:0;margin:0;">
-									<div class="bar bar-warning" style="width: {%?server[disk_usage]}%;padding-top:5px;">U</div>
-									<div class="bar bar-success" style="width: {%?server[disk_free]}%;padding-top:5px;">F</div>
-								</div>
-							</div>
-						{%/if}
-						{%if isempty|server[status] == true}
-							Server is currently unconnectable.
-						{%/if}
-					</div>
-				</div>
-			</div>
-			{%if isempty|server[type] == true}<div class="clear"></div>{%/if}
-		{%/foreach}
-	{%/if}
-	{%if isset|Statistics == false}
-		<br><br>
-		<div align="center">
-			Add a server to Feathur so updates will appear here.
-		</div>
-	{%/if}
+				}
+                
+                if(serversoffline.length !== 0)
+                {
+                    $("#errorcontain .errorbox p.inlineB").empty();
+                    $("#errorcontain .errorbox p.inlineB").html(serversoffline.join(", "));
+                    $("#errorcontain .errorbox").css("display","inline-block");
+                }else{
+                    $("#errorcontain .errorbox").css("display","none");
+                }
+                if(servershighbandwidth.length !== 0)
+                {
+                    $("#errorcontain .warningbox.1 p.inlineB").empty();
+                    $("#errorcontain .warningbox.1 p.inlineB").html(servershighbandwidth.join(", "));
+                    $("#errorcontain .warningbox.1").css("display","inline-block");
+                }else{
+                    $("#errorcontain .warningbox.1").css("display","none");
+                }
+                $("#timerStats span:nth-child(1)").html(servercount - serversoffline.length);
+                $("#timerStats span:nth-child(2), #timerStats span:nth-child(4)").html(servercount);
+                $("#timerStats span:nth-child(3)").html(servershighbandwidth.length);
+			});
+            counttx = 0;
+            loading(0);
+            prevServerCount = curServerCount;
+		}
+		
+		uptime();
+		setInterval(uptime, 10000);
+        setInterval(timerrx, 1000);
+	});
+</script>
+{%if isset|Statistics == false}
+<div class="pure-u-sm-1 pure-u-md-1 pure-u-lg-1-2 pure-u-xl-1-3 whitebox" style="display: block;margin: 0 auto;">
+    <p class="alert warningbox static-alert">Whoops! There aren't any servers to show!<br>Add a server to feathur to have it shown here.</p>
+    <br>
+    <a href="admin.php?view=addserver" style="display: block;margin: 0 auto;"><div id="addServer"><b>+</b></div></a>
+</div>
+{%/if}
 </div>
